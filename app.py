@@ -10,7 +10,7 @@ import time
 PORTKEY_API_KEY = "eIp6VbA0BucuOCUr3Z0lw7UJ9Ls/"
 
 def get_portkey_client():
-    custom_timeout = httpx.Timeout(30.0, connect=30.0)
+    custom_timeout = httpx.Timeout(60.0, connect=10.0, read=60.0, write=10.0)
     return Portkey(
         api_key=PORTKEY_API_KEY,
         base_url="https://eu.aigw.galileo.roche.com/v1",
@@ -19,7 +19,7 @@ def get_portkey_client():
         timeout=custom_timeout,
     )
 
-def call_llm_with_retries(portkey, event_type, context, retries=3, wait=5):
+def call_llm_with_retries(portkey, event_type, context, retries=5, wait=10):
     prompt = f"""
 Type of Event: {event_type}
 Context Information:
@@ -39,7 +39,7 @@ Rationale: <text>
                 max_tokens=300,
                 temperature=0.6,
                 stream=False,
-                request_timeout=20000
+                request_timeout=60000  # 60 seconds timeout
             )
             output_text = completion.choices[0].message.content.strip()
             score, rationale = None, None
@@ -47,13 +47,13 @@ Rationale: <text>
                 if line.lower().startswith("score:"):
                     try:
                         score = float(line.split(":", 1)[1].strip())
-                    except:
+                    except Exception:
                         pass
                 elif line.lower().startswith("rationale:"):
                     rationale = line.split(":", 1)[1].strip()
             return score, rationale
         except Exception as e:
-            st.warning(f"API call failed on attempt {attempt+1}: {e}")
+            st.warning(f"API call failed on attempt {attempt+1}: {e}. Retrying after {wait} seconds...")
             time.sleep(wait)
             attempt += 1
     return None, None
@@ -147,24 +147,16 @@ Related: {press.get('related','')}
 
 def main():
     st.title("Zilebesiran Clinical Trial Risk Dashboard")
-
     portkey = get_portkey_client()
 
-    uploaded_trials = st.file_uploader("Upload Clinical Trials CSV", type=["csv"])
-    uploaded_press = st.file_uploader("Upload Press Releases CSV", type=["csv"])
-
-    if uploaded_trials is None or uploaded_press is None:
-        st.info("Please upload clinical trials and press releases CSV files to start.")
-        return
-
-    trials_df = pd.read_csv(uploaded_trials, parse_dates=['StartDate', 'CompletionDate'])
-    press_df = pd.read_csv(uploaded_press)
+    # Load data directly from repo CSV files (no uploader)
+    trials_df = pd.read_csv("zilebesiran_clinical_trials.csv", parse_dates=['StartDate', 'CompletionDate'])
+    press_df = pd.read_csv("zilebesiran_filtered_news.csv")
     press_df['Date'] = pd.to_datetime(press_df['datetime'], unit='s', errors='coerce')
 
     timeline_df = build_timeline(portkey, trials_df, press_df)
 
     st.subheader("Risk Monitoring Table")
-
     def risk_color(val):
         if pd.isnull(val):
             return ''
@@ -173,11 +165,9 @@ def main():
         elif val > 0.4:
             return 'background-color: #ffc107; font-weight: bold;'
         return ''
-
     st.dataframe(timeline_df.style.applymap(risk_color, subset=['RiskScore']))
 
     st.subheader("Risk Score Timeline")
-
     import matplotlib.dates as mdates
     fig, ax = plt.subplots(figsize=(15, 7))
     colors = {'ClinicalTrial': '#1f77b4', 'PressRelease': '#ff7f0e'}
@@ -194,28 +184,14 @@ def main():
     ax.set_ylabel("Risk Score")
     ax.grid(True, linestyle='--', alpha=0.4)
     ax.legend()
-
     locator = mdates.AutoDateLocator()
     formatter = mdates.ConciseDateFormatter(locator)
     ax.xaxis.set_major_locator(locator)
     ax.xaxis.set_major_formatter(formatter)
     plt.xticks(rotation=45)
     plt.tight_layout()
-
     st.pyplot(fig)
-
-@st.cache_resource
-def get_portkey_client():
-    custom_timeout = httpx.Timeout(30.0, connect=30.0)
-    return Portkey(
-        api_key=PORTKEY_API_KEY,
-        base_url="https://eu.aigw.galileo.roche.com/v1",
-        debug=False,
-        provider='azure-openai',
-        timeout=custom_timeout
-    )
 
 if __name__ == "__main__":
     main()
-
 
