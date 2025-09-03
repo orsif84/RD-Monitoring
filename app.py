@@ -15,7 +15,7 @@ def get_portkey_client():
     custom_timeout = httpx.Timeout(30.0, connect=30.0)
     # Initialize Portkey client exactly as specified
     client = Portkey(
-        api_key=st.secrets["PORTKEY_API_KEY"],
+        api_key=st.secrets["eIp6VbA0BucuOCUr3Z0lw7UJ9Ls/"],
         base_url="https://eu.aigw.galileo.roche.com/v1",
         debug=False,
         provider='azure-openai',
