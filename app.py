@@ -3,25 +3,21 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.dates import AutoDateLocator, ConciseDateFormatter
-from dotenv import load_dotenv
-from portkey_ai import Portkey
 import httpx
+from portkey_ai import Portkey
 import time
 
-load_dotenv()
+PORTKEY_API_KEY = "eIp6VbA0BucuOCUr3Z0lw7UJ9Ls/"
 
-@st.cache_resource
 def get_portkey_client():
     custom_timeout = httpx.Timeout(30.0, connect=30.0)
-    # Initialize Portkey client exactly as specified
-    client = Portkey(
-        api_key=st.secrets["eIp6VbA0BucuOCUr3Z0lw7UJ9Ls/"],
+    return Portkey(
+        api_key=PORTKEY_API_KEY,
         base_url="https://eu.aigw.galileo.roche.com/v1",
         debug=False,
         provider='azure-openai',
         timeout=custom_timeout,
     )
-    return client
 
 def call_llm_with_retries(portkey, event_type, context, retries=3, wait=5):
     prompt = f"""
@@ -63,7 +59,6 @@ Rationale: <text>
     return None, None
 
 def fallback_risk(event_type, event):
-    # Same heuristic fallback logic as before
     risk = 0.0
     reasons = []
     if event_type == "Clinical Trial":
@@ -209,6 +204,18 @@ def main():
 
     st.pyplot(fig)
 
+@st.cache_resource
+def get_portkey_client():
+    custom_timeout = httpx.Timeout(30.0, connect=30.0)
+    return Portkey(
+        api_key=PORTKEY_API_KEY,
+        base_url="https://eu.aigw.galileo.roche.com/v1",
+        debug=False,
+        provider='azure-openai',
+        timeout=custom_timeout
+    )
+
 if __name__ == "__main__":
     main()
+
 
